@@ -33,7 +33,10 @@ const SingleColor = ({ hex, locked, onToggleLock, onCopy, isActive }: any) => {
                 <button
                     type="button"
                     className="icon-btn"
-                    onClick={onToggleLock}
+                    onClick={(e) => {
+                        (e.currentTarget as HTMLButtonElement).blur();
+                        onToggleLock();
+                    }}
                     aria-pressed={locked}
                     aria-label={locked ? `Unlock ${hex}` : `Lock ${hex}`}
                     title={locked ? "Unlock" : "Lock"}
@@ -44,7 +47,10 @@ const SingleColor = ({ hex, locked, onToggleLock, onCopy, isActive }: any) => {
                 <button
                     type="button"
                     className="icon-btn"
-                    onClick={() => onCopy()}
+                    onClick={(e) => {
+                        (e.currentTarget as HTMLButtonElement).blur();
+                        onCopy(hex);
+                    }}
                     aria-label={`Copy ${hex}`}
                     title="Copy hex"
                 >
@@ -55,7 +61,10 @@ const SingleColor = ({ hex, locked, onToggleLock, onCopy, isActive }: any) => {
             <button
                 type="button"
                 className="hex-btn"
-                onClick={() => onCopy(hex)}
+                onClick={(e) => {
+                    (e.currentTarget as HTMLButtonElement).blur();
+                    onCopy(hex);
+                }}
                 aria-label={`Copy ${hex}`}
                 title="Copy"
             >

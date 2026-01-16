@@ -27,6 +27,13 @@
   #root {
     height: 100%;
   }
+
+  #root {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
   
   body {
     margin: 0;
@@ -51,6 +58,7 @@
       var(--bg);
     line-height: 1.25;
     overflow: hidden;
+    overflow-x: hidden;
   }
   
   button,
@@ -85,6 +93,35 @@
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  .menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    cursor: pointer;
+    place-items: center;
+    transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
+  }
+
+  .menu-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+  }
+
+  .menu-btn:active {
+    transform: translateY(0px);
+  }
+
+  .menu-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
   }
   
   .logo-mark {
@@ -217,10 +254,12 @@
     Palette
   =========== */
   .palette {
-    height: calc(100vh - var(--topbar-h));
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
+    flex: 1;
+    min-height: 0;
+    --palette-rows: 5;
   }
   
   .palette__cell {
@@ -336,6 +375,13 @@
   }
   
   /* ============
+    Mobile bottom bar
+  =========== */
+  .mobile-generate-bar {
+    display: none;
+  }
+
+  /* ============
     Responsive
   =========== */
   @media (max-width: 900px) {
@@ -354,10 +400,208 @@
       white-space: normal;
     }
     .palette {
-      height: auto;
-      min-height: calc(100vh - var(--topbar-h));
       grid-auto-flow: row;
       grid-auto-rows: minmax(140px, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    :root {
+      --gap: 10px;
+      --topbar-h: 76px;
+      --mobile-bar-h: 72px;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .topbar {
+      padding: 12px 12px;
+      min-height: auto;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "brand menu"
+        "controls controls"
+        "hint hint";
+      align-items: center;
+    }
+
+    .topbar__brand {
+      grid-area: brand;
+    }
+
+    .menu-btn {
+      grid-area: menu;
+      display: grid;
+      justify-self: end;
+      align-self: center;
+    }
+
+    .controls {
+      grid-area: controls;
+    }
+
+    .topbar__hint {
+      grid-area: hint;
+    }
+
+    .topbar[data-menu-open="false"] .controls,
+    .topbar[data-menu-open="false"] .topbar__hint {
+      display: none;
+    }
+
+    .brand-subtitle {
+      display: none;
+    }
+
+    .controls {
+      width: 100%;
+      justify-content: stretch;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .controls .field:not(.field--small) {
+      grid-column: 1 / -1;
+    }
+
+    .text-input {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .controls .btn {
+      width: 100%;
+    }
+
+    .btn {
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .select {
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .field--small {
+      width: auto;
+      grid-column: 1 / -1;
+    }
+
+    .topbar__hint {
+      font-size: 11px;
+    }
+
+    .palette {
+      grid-auto-rows: unset;
+      grid-template-rows: repeat(var(--palette-rows), minmax(0, 1fr));
+      overflow: hidden;
+      padding-bottom: calc(var(--mobile-bar-h) + env(safe-area-inset-bottom));
+    }
+
+    .palette-col {
+      padding: 10px 10px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+    }
+
+    .icon-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .hex-btn {
+      padding: 8px 12px;
+      letter-spacing: 0.06em;
+      font-size: 13px;
+    }
+
+    .palette-col__hint {
+      display: none;
+    }
+
+    .mobile-generate-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      display: grid;
+      padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      background: rgba(10, 15, 26, 0.72);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+    }
+
+    .mobile-generate-btn {
+      height: 44px;
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(110, 231, 255, 0.35);
+      background: linear-gradient(
+        135deg,
+        rgba(110, 231, 255, 0.24),
+        rgba(167, 139, 250, 0.2)
+      );
+      color: var(--text);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+    }
+
+    .mobile-generate-btn:active {
+      transform: translateY(1px);
+    }
+
+    .toast {
+      bottom: calc(16px + var(--mobile-bar-h) + env(safe-area-inset-bottom));
+    }
+  }
+
+  @media (max-width: 420px) {
+    :root {
+      --topbar-h: 76px;
+    }
+
+    .topbar {
+      padding: 10px 10px;
+    }
+
+    .logo-mark {
+      width: 30px;
+      height: 30px;
+    }
+
+    .controls {
+      grid-template-columns: 1fr;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+    }
+
+    .icon-btn svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .controls .field,
+    .controls .btn {
+      grid-column: 1 / -1;
+    }
+
+    .palette {
+      /* keep "no-scroll" behavior from the 600px breakpoint */
     }
   }
   

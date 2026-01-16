@@ -8,6 +8,10 @@ function App() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [colorInput, setColorInput] = useState("");
   const [error, setError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 601px)").matches;
+  });
   const [toast, setToast] = useState<{ type: string, message: string } | null>(null);
 
   const [palette, setPalette] = useState(() =>
@@ -64,28 +68,31 @@ function App() {
   const onCopyPalette = () => onCopy(paletteString);
 
   useEffect(() => {
-    const onKeyDown = (e: any) => {
-      const target = e.target;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+
+      const target = e.target as HTMLElement | null;
       const isTyping =
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
       if (isTyping) return;
-      const active = document.activeElement;
-      if (
-        active &&
-        (active.tagName === "BUTTON" ||
-          active.tagName === "A" ||
-          active.tagName === "SELECT")
-      )
-        return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        generate();
-      }
+
+      // Let native controls keep their expected keyboard behavior.
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.tagName === "SELECT") return;
+
+      // Prevent Space from "clicking" focused buttons/links (e.g. lock/unlock),
+      // and use it exclusively as the global "generate" shortcut.
+      e.preventDefault();
+      e.stopPropagation();
+      generate();
     };
-    window.addEventListener("keydown", onKeyDown, { passive: false });
+    window.addEventListener("keydown", onKeyDown, {
+      passive: false,
+      capture: true,
+    });
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -95,6 +102,15 @@ function App() {
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    // Keep controls always visible on desktop; collapsible on mobile.
+    const mql = window.matchMedia("(min-width: 601px)");
+    const onChange = () => setMenuOpen(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     // keep palette length in sync with count
@@ -112,14 +128,26 @@ function App() {
 
   return (
     <>
-      <header className="topbar">
+      <header className="topbar" data-menu-open={menuOpen ? "true" : "false"}>
         <div className="topbar__brand" role="banner">
           <div className="logo-mark" aria-hidden="true" />
           <div className="brand-text">
-            <div className="brand-title">Palette</div>
-            <div className="brand-subtitle">coolors-style generator</div>
+            <div className="brand-title">Palette Studio</div>
+            <div className="brand-subtitle">Color Palette Generator</div>
           </div>
         </div>
+
+        <button
+          className="menu-btn"
+          type="button"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16v2H4V7Zm0 6h16v2H4v-2Zm0 6h16v2H4v-2Z" />
+          </svg>
+        </button>
 
         <form className="controls" onSubmit={handleSubmit}>
           <label className="field">
@@ -173,7 +201,11 @@ function App() {
         </div>
       </header>
 
-      <main className="palette" role="main">
+      <main
+        className="palette"
+        role="main"
+        style={{ ["--palette-rows" as any]: count }}
+      >
         {palette.map((c, index) => (
           <div
             key={index}
@@ -191,6 +223,12 @@ function App() {
           </div>
         ))}
       </main>
+
+      <div className="mobile-generate-bar" role="presentation">
+        <button className="mobile-generate-btn" type="button" onClick={generate}>
+          Generate
+        </button>
+      </div>
 
       {toast && (
         <div
