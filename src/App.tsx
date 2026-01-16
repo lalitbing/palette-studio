@@ -130,7 +130,13 @@ function App() {
     <>
       <header className="topbar" data-menu-open={menuOpen ? "true" : "false"}>
         <div className="topbar__brand" role="banner">
-          <div className="logo-mark" aria-hidden="true" />
+          <img
+            className="logo-mark"
+            src="/favicon.svg"
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+          />
           <div className="brand-text">
             <div className="brand-title">Palette Studio</div>
             <div className="brand-subtitle">Color Palette Generator</div>
