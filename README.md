@@ -1,73 +1,63 @@
-# React + TypeScript + Vite
+# 🎨 Palette Studio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A beautiful, fast color palette generator built with React and TypeScript. Generate stunning color combinations with a single keypress.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)
+![Tailwind](https://img.shields.io/badge/Tailwind-4.1-06B6D4?logo=tailwindcss)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## React Compiler
+- **Instant Generation** — Press `Space` to generate a fresh palette
+- **Lock Colors** — Keep your favorites while regenerating the rest
+- **Copy Anywhere** — One-click copy for individual colors or the entire palette
+- **Flexible Layouts** — Choose 2–8 color columns
+- **Smart Contrast** — Text automatically adapts for readability (WCAG-compliant)
+- **Responsive Design** — Works beautifully on desktop and mobile
+- **Zero Dependencies** — Just React, TypeScript, and Tailwind CSS
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Getting Started
 
-## Expanding the ESLint configuration
+```bash
+# Install dependencies
+npm install
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Start development server
+npm run dev
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Build for production
+npm run build
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Preview production build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🎯 Usage
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Action | How |
+|--------|-----|
+| Generate new palette | Press `Space` or click **Generate** |
+| Lock a color | Click the 🔒 icon on any color |
+| Copy a color | Click the hex code or 📋 icon |
+| Copy entire palette | Click **Copy palette** |
+| Set specific color | Enter hex (e.g. `#FF6B6B`) and click **Apply** |
+| Change column count | Use the **Columns** dropdown |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠 Tech Stack
+
+- **React 19** — UI framework
+- **TypeScript** — Type safety
+- **Tailwind CSS 4** — Styling
+- **Vite 7** — Build tool & dev server
+
+## 📁 Project Structure
+
+```
+src/
+├── App.tsx         # Main app component & state
+├── SingleColor.tsx # Individual color column component
+├── utils.ts        # Color utilities (hex conversion, luminance, clipboard)
+├── index.css       # Global styles
+└── main.tsx        # Entry point
 ```
