@@ -57,8 +57,8 @@ export function contrastRatio(a: string, b: string) {
 
 export function getReadableTextColor(hex: string) {
   // Pick whichever of near-black / white has the higher WCAG contrast.
-  const dark = "#111827";
-  const light = "#FFFFFF";
+  const dark = "#18181B";
+  const light = "#FAFAFA";
   return contrastRatio(hex, dark) >= contrastRatio(hex, light) ? dark : light;
 }
 
@@ -140,9 +140,9 @@ export function hexToOklch(hex: string): Oklch {
 export const HARMONIES = [
   { id: "auto", label: "Auto" },
   { id: "analogous", label: "Analogous" },
-  { id: "monochrome", label: "Monochrome" },
+  { id: "monochrome", label: "Mono" },
   { id: "complementary", label: "Complementary" },
-  { id: "split", label: "Split complementary" },
+  { id: "split", label: "Split" },
   { id: "triadic", label: "Triadic" },
   { id: "tetradic", label: "Tetradic" },
   { id: "random", label: "Random" },
@@ -161,7 +161,16 @@ const HUE_OFFSETS: Record<Exclude<Harmony, "auto" | "random">, number[]> = {
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-export type Swatch = { hex: string; locked: boolean };
+export type Swatch = { id: string; hex: string; locked: boolean };
+
+let idCounter = 0;
+/** Stable identity per swatch so reorders and inserts can animate. */
+export const newSwatchId = () => `s${++idCounter}`;
+
+export function formatOklch(hex: string) {
+  const { l, c, h } = hexToOklch(hex);
+  return `${Math.round(l * 100)}% ${c.toFixed(2)} ${c < 0.005 ? 0 : Math.round(h)}`;
+}
 
 /**
  * Fill the unlocked slots with a harmonious set of colors.
@@ -228,7 +237,7 @@ export function paletteFromHash(hash: string): Swatch[] | null {
   if (parts.length < 2 || parts.length > 10) return null;
   const hexes = parts.map(normalizeHex);
   if (hexes.some((h) => !h)) return null;
-  return hexes.map((hex) => ({ hex: hex!, locked: false }));
+  return hexes.map((hex) => ({ id: newSwatchId(), hex: hex!, locked: false }));
 }
 
 export function toCssVars(p: Swatch[]) {

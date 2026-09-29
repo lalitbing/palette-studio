@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { contrastRatio, formatRgb, getReadableTextColor } from "./utils";
+import { motion } from "motion/react";
+import {
+  Copy,
+  DotsSixVertical,
+  Eyedropper,
+  LockSimple,
+  LockSimpleOpen,
+  Plus,
+  X,
+} from "@phosphor-icons/react";
+import { contrastRatio, formatOklch, getReadableTextColor } from "./utils";
 
 type Props = {
   index: number;
   hex: string;
   locked: boolean;
+  reduceMotion: boolean;
   isActive: boolean;
   isEditing: boolean;
   isDragging: boolean;
@@ -24,21 +35,7 @@ type Props = {
   onDropOn: () => void;
 };
 
-const Icon = ({ d, filled }: { d: string; filled?: boolean }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className={filled ? "is-filled" : undefined}>
-    <path d={d} />
-  </svg>
-);
-
-const ICONS = {
-  lockClosed: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z",
-  lockOpen: "M7 11V8a5 5 0 0 1 9.6-2M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z",
-  copy: "M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1ZM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1",
-  remove: "M6 6l12 12M18 6 6 18",
-  drag: "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01",
-  pick: "m14.5 5.5 4 4M4 20l1-4L15.5 5.5a2.1 2.1 0 0 1 3 3L8 19l-4 1Z",
-  plus: "M12 5v14M5 12h14",
-};
+const ICON = { size: 20, weight: "regular" } as const;
 
 /** Mounted only while editing, so the draft starts fresh from the current hex. */
 const HexInput = ({ initial, onEnd }: { initial: string; onEnd: (value: string | null) => void }) => {
@@ -81,15 +78,18 @@ const SingleColor = (p: Props) => {
   const [dropTarget, setDropTarget] = useState(false);
 
   return (
-    <section
+    <motion.section
+      layout={!p.reduceMotion}
+      initial={p.reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: p.isDragging ? 0.4 : 1 }}
+      transition={{ layout: { type: "spring", stiffness: 420, damping: 42 }, opacity: { duration: 0.2 } }}
       className={[
         "swatch",
         p.isActive && "is-active",
         p.locked && "is-locked",
-        p.isDragging && "is-dragging",
         dropTarget && "is-drop-target",
       ].filter(Boolean).join(" ")}
-      style={{ backgroundColor: p.hex, color: fg, ["--fg" as string]: fg }}
+      style={{ backgroundColor: p.hex, color: fg, ["--fg" as string]: fg, ["--swatch-bg" as string]: p.hex }}
       aria-label={`Color ${p.index + 1}: ${p.hex}${p.locked ? ", locked" : ""}`}
       aria-current={p.isActive ? "true" : undefined}
       onPointerDown={p.onSelect}
@@ -97,6 +97,11 @@ const SingleColor = (p: Props) => {
       onDragLeave={() => setDropTarget(false)}
       onDrop={(e) => { e.preventDefault(); setDropTarget(false); p.onDropOn(); }}
     >
+      <div className="swatch__top">
+        <span className="swatch__index" aria-hidden="true">{p.index + 1}</span>
+        {p.locked && <LockSimple className="swatch__lock-mark" size={16} weight="fill" aria-hidden="true" />}
+      </div>
+
       <div className="swatch__actions">
         <button
           type="button"
@@ -106,7 +111,7 @@ const SingleColor = (p: Props) => {
           aria-label={`Remove ${p.hex}`}
           title="Remove (⌫)"
         >
-          <Icon d={ICONS.remove} />
+          <X {...ICON} />
         </button>
         <span
           className="swatch-btn swatch-btn--drag"
@@ -120,13 +125,13 @@ const SingleColor = (p: Props) => {
           title="Drag to reorder (Shift + ←/→)"
           aria-hidden="true"
         >
-          <Icon d={ICONS.drag} />
+          <DotsSixVertical {...ICON} weight="bold" />
         </span>
         <button type="button" className="swatch-btn" onClick={p.onCopy} aria-label={`Copy ${p.hex}`} title="Copy hex (C)">
-          <Icon d={ICONS.copy} />
+          <Copy {...ICON} />
         </button>
         <label className="swatch-btn" title="Pick a color">
-          <Icon d={ICONS.pick} />
+          <Eyedropper {...ICON} />
           <input
             type="color"
             className="swatch__picker"
@@ -143,7 +148,7 @@ const SingleColor = (p: Props) => {
           aria-label={p.locked ? `Unlock ${p.hex}` : `Lock ${p.hex}`}
           title={p.locked ? "Unlock (L)" : "Lock (L)"}
         >
-          <Icon d={p.locked ? ICONS.lockClosed : ICONS.lockOpen} />
+          {p.locked ? <LockSimple {...ICON} weight="fill" /> : <LockSimpleOpen {...ICON} />}
         </button>
       </div>
 
@@ -155,15 +160,17 @@ const SingleColor = (p: Props) => {
             {p.hex.slice(1)}
           </button>
         )}
-        <div className="swatch__meta">
-          <span>RGB {formatRgb(p.hex)}</span>
-          <span className="swatch__badge" title={`Text contrast ${ratio.toFixed(2)}:1`}>
-            {grade} {ratio.toFixed(1)}
-          </span>
-        </div>
+        <dl className="swatch__meta">
+          <div>
+            <dt>OKLCH</dt>
+            <dd>{formatOklch(p.hex)}</dd>
+          </div>
+          <div title={`Text contrast ${ratio.toFixed(2)}:1`}>
+            <dt>Contrast</dt>
+            <dd>{ratio.toFixed(1)} {grade}</dd>
+          </div>
+        </dl>
       </div>
-
-      <div className="swatch__index" aria-hidden="true">{p.index + 1}</div>
 
       {!p.isLast && p.canAdd && (
         <button
@@ -175,11 +182,11 @@ const SingleColor = (p: Props) => {
           title="Insert blended color (A)"
         >
           <span className="swatch__insert-dot">
-            <Icon d={ICONS.plus} />
+            <Plus size={16} weight="bold" />
           </span>
         </button>
       )}
-    </section>
+    </motion.section>
   );
 };
 

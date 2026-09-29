@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
+import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  CaretDown,
+  CheckCircle,
+  Export,
+  Keyboard,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react";
 import SingleColor from "./SingleColor";
 import {
   HARMONIES,
   copyToClipboard,
   generatePalette,
   mixHex,
+  newSwatchId,
   normalizeHex,
   paletteFromHash,
   paletteToHash,
@@ -21,30 +33,47 @@ const HISTORY_LIMIT = 100;
 
 type History = { past: Swatch[][]; present: Swatch[]; future: Swatch[][] };
 
-const SHORTCUTS: { keys: string[]; label: string }[] = [
-  { keys: ["Space"], label: "Generate a new palette" },
-  { keys: ["←", "→"], label: "Select previous / next color" },
-  { keys: ["1–9"], label: "Jump to color" },
-  { keys: ["Shift", "←/→"], label: "Move selected color" },
-  { keys: ["L"], label: "Lock / unlock selected color" },
-  { keys: ["C"], label: "Copy selected hex" },
-  { keys: ["E"], label: "Edit selected hex" },
-  { keys: ["A"], label: "Add color after selected" },
-  { keys: ["⌫"], label: "Remove selected color" },
-  { keys: ["H"], label: "Cycle harmony" },
-  { keys: ["⌘/Ctrl", "Z"], label: "Undo" },
-  { keys: ["⌘/Ctrl", "Shift", "Z"], label: "Redo" },
-  { keys: ["Shift", "C"], label: "Copy all hex codes" },
-  { keys: ["S"], label: "Copy share link" },
-  { keys: ["?"], label: "Show shortcuts" },
+const SHORTCUT_GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = [
+  {
+    title: "Generate",
+    items: [
+      { keys: ["Space"], label: "New palette" },
+      { keys: ["H"], label: "Next harmony" },
+      { keys: ["Shift", "H"], label: "Previous harmony" },
+      { keys: ["⌘", "Z"], label: "Undo" },
+      { keys: ["⌘", "Shift", "Z"], label: "Redo" },
+    ],
+  },
+  {
+    title: "Arrange",
+    items: [
+      { keys: ["←", "→"], label: "Select color" },
+      { keys: ["1-9"], label: "Jump to color" },
+      { keys: ["Shift", "←", "→"], label: "Move color" },
+      { keys: ["A"], label: "Add color" },
+      { keys: ["⌫"], label: "Remove color" },
+    ],
+  },
+  {
+    title: "Color",
+    items: [
+      { keys: ["L"], label: "Lock or unlock" },
+      { keys: ["C"], label: "Copy hex" },
+      { keys: ["Shift", "C"], label: "Copy all hex" },
+      { keys: ["E"], label: "Edit hex" },
+      { keys: ["S"], label: "Copy share link" },
+    ],
+  },
 ];
+
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 function initialPalette(): Swatch[] {
   const fromUrl =
     typeof window !== "undefined" ? paletteFromHash(window.location.hash) : null;
   if (fromUrl) return fromUrl;
   return generatePalette(
-    Array.from({ length: DEFAULT_COUNT }, () => ({ hex: "#000000", locked: false })),
+    Array.from({ length: DEFAULT_COUNT }, () => ({ id: newSwatchId(), hex: "#000000", locked: false })),
     "auto"
   );
 }
@@ -58,13 +87,14 @@ function App() {
   const palette = history.present;
   const [harmony, setHarmony] = useState<Harmony>("auto");
   const [selected, setActiveIndex] = useState(0);
-  // Undo/redo can shrink the palette under the selection — clamp on read.
+  // Undo/redo can shrink the palette under the selection, so clamp on read.
   const activeIndex = Math.min(selected, palette.length - 1);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string; id: number } | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const exportRef = useRef<HTMLDivElement>(null);
   const helpCloseRef = useRef<HTMLButtonElement>(null);
@@ -147,7 +177,7 @@ function App() {
         const right = p[afterIndex + 1];
         const hex = left && right ? mixHex(left.hex, right.hex) : randomHex();
         const next = [...p];
-        next.splice(afterIndex + 1, 0, { hex, locked: false });
+        next.splice(afterIndex + 1, 0, { id: newSwatchId(), hex, locked: false });
         return next;
       });
       setActiveIndex(afterIndex + 1);
@@ -180,7 +210,7 @@ function App() {
 
   const exportOptions = [
     { label: "HEX list", hint: "#FF6B6B, …", run: () => onCopy(palette.map((c) => c.hex).join(", "), "hex codes") },
-    { label: "CSS variables", hint: ":root { … }", run: () => onCopy(toCssVars(palette), "CSS variables") },
+    { label: "CSS variables", hint: ":root {…}", run: () => onCopy(toCssVars(palette), "CSS variables") },
     { label: "JSON array", hint: '["#…"]', run: () => onCopy(JSON.stringify(palette.map((c) => c.hex)), "JSON") },
     { label: "Share link", hint: "URL", run: () => onCopy(shareUrl(), "share link") },
   ];
@@ -205,7 +235,9 @@ function App() {
       if (exportOpen) setExportOpen(false);
       return;
     }
-    if (isTyping || helpOpen) return;
+    // Radio inputs (harmony picker) keep native arrow keys, but Space still generates.
+    const isRadio = target instanceof HTMLInputElement && target.type === "radio";
+    if ((isTyping && !(isRadio && e.key === " ")) || helpOpen) return;
 
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
@@ -306,7 +338,9 @@ function App() {
       if (!exportRef.current?.contains(e.target as Node)) setExportOpen(false);
     };
     window.addEventListener("pointerdown", onDown);
-    exportRef.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus();
+    requestAnimationFrame(() =>
+      exportRef.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus()
+    );
     return () => window.removeEventListener("pointerdown", onDown);
   }, [exportOpen]);
 
@@ -323,6 +357,21 @@ function App() {
   };
 
   const allLocked = palette.every((c) => c.locked);
+  const popIn = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: -4, scale: 0.98 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -4, scale: 0.98 }, transition: { duration: 0.18, ease: EASE } };
+
+  const harmonySelect = (
+    <label className="harmony-select">
+      <span className="sr-only">Harmony</span>
+      <select value={harmony} onChange={(e) => setHarmony(e.target.value as Harmony)} title="Color harmony (H)">
+        {HARMONIES.map((h) => (
+          <option key={h.id} value={h.id}>{h.label}</option>
+        ))}
+      </select>
+      <CaretDown size={14} weight="bold" aria-hidden="true" />
+    </label>
+  );
 
   return (
     <>
@@ -332,83 +381,90 @@ function App() {
           <span className="brand__title">Palette Studio</span>
         </div>
 
-        <p className="topbar__hint" aria-hidden="true">
-          Press <kbd className="kbd">Space</kbd> to generate
-          <span className="topbar__hint-sep">·</span>
-          <button type="button" className="link-btn" onClick={() => setHelpOpen(true)}>
-            <kbd className="kbd">?</kbd> shortcuts
-          </button>
-        </p>
+        <div className="topbar__center">
+          <fieldset className="segmented" title="Color harmony (H)">
+            <legend className="sr-only">Harmony</legend>
+            <LayoutGroup id="harmony">
+              {HARMONIES.map((h) => (
+                <label key={h.id} className="segmented__item" data-checked={harmony === h.id}>
+                  <input
+                    type="radio"
+                    name="harmony"
+                    value={h.id}
+                    checked={harmony === h.id}
+                    onChange={() => setHarmony(h.id)}
+                    className="sr-only"
+                  />
+                  {harmony === h.id && (
+                    <motion.span
+                      layoutId="harmony-pill"
+                      className="segmented__pill"
+                      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                  <span className="segmented__label">{h.label}</span>
+                </label>
+              ))}
+            </LayoutGroup>
+          </fieldset>
+          <div className="harmony-select-wrap">{harmonySelect}</div>
+        </div>
 
         <div className="toolbar">
-          <label className="harmony">
-            <span className="sr-only">Harmony</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="harmony__icon">
-              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
-              <circle cx="12" cy="5.5" r="2" /><circle cx="17.6" cy="15.2" r="2" /><circle cx="6.4" cy="15.2" r="2" />
-            </svg>
-            <select
-              className="harmony__select"
-              value={harmony}
-              onChange={(e) => setHarmony(e.target.value as Harmony)}
-              title="Color harmony (H)"
-            >
-              {HARMONIES.map((h) => (
-                <option key={h.id} value={h.id}>{h.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <span className="toolbar__divider" aria-hidden="true" />
-
-          <button className="tool-btn" type="button" onClick={undo} disabled={!history.past.length} aria-label="Undo" title="Undo (⌘Z)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+          <button className="icon-btn" type="button" onClick={undo} disabled={!history.past.length} aria-label="Undo" title="Undo (⌘Z)">
+            <ArrowCounterClockwise size={18} weight="regular" />
           </button>
-          <button className="tool-btn" type="button" onClick={redo} disabled={!history.future.length} aria-label="Redo" title="Redo (⇧⌘Z)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>
+          <button className="icon-btn" type="button" onClick={redo} disabled={!history.future.length} aria-label="Redo" title="Redo (⇧⌘Z)">
+            <ArrowClockwise size={18} weight="regular" />
           </button>
-
-          <span className="toolbar__divider" aria-hidden="true" />
 
           <div className="menu" ref={exportRef}>
             <button
-              className="tool-btn tool-btn--label"
+              className="icon-btn icon-btn--label"
               type="button"
               aria-haspopup="menu"
               aria-expanded={exportOpen}
               onClick={() => setExportOpen((v) => !v)}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12" /><path d="m7 8 5-5 5 5" /><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></svg>
+              <Export size={18} weight="regular" />
               <span>Export</span>
             </button>
-            {exportOpen && (
-              <div className="menu__list" role="menu" aria-label="Copy palette as" onKeyDown={onMenuKeyDown}>
-                <div className="menu__heading">Copy as</div>
-                {exportOptions.map((o) => (
-                  <button
-                    key={o.label}
-                    type="button"
-                    role="menuitem"
-                    className="menu__item"
-                    onClick={() => { o.run(); setExportOpen(false); }}
-                  >
-                    <span>{o.label}</span>
-                    <span className="menu__hint">{o.hint}</span>
-                  </button>
-                ))}
-                <div className="menu__swatches" aria-hidden="true">
-                  {palette.map((c, i) => <span key={i} style={{ background: c.hex }} />)}
-                </div>
-              </div>
-            )}
+            <AnimatePresence>
+              {exportOpen && (
+                <motion.div
+                  className="menu__list"
+                  role="menu"
+                  aria-label="Copy palette as"
+                  onKeyDown={onMenuKeyDown}
+                  {...popIn}
+                >
+                  <div className="menu__swatches" aria-hidden="true">
+                    {palette.map((c) => <span key={c.id} style={{ background: c.hex }} />)}
+                  </div>
+                  {exportOptions.map((o) => (
+                    <button
+                      key={o.label}
+                      type="button"
+                      role="menuitem"
+                      className="menu__item"
+                      onClick={() => { o.run(); setExportOpen(false); }}
+                    >
+                      <span>{o.label}</span>
+                      <span className="menu__hint">{o.hint}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          <button className="tool-btn tool-btn--help" type="button" onClick={() => setHelpOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6.5 10h1M10.5 10h1M14.5 10h1M8 14h8" /></svg>
+          <button className="icon-btn icon-btn--help" type="button" onClick={() => setHelpOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+            <Keyboard size={18} weight="regular" />
           </button>
 
-          <button className="primary-btn" type="button" onClick={generate} disabled={allLocked} title="Generate (Space)">
-            Generate
+          <button className="generate-btn" type="button" onClick={generate} disabled={allLocked} title="Generate (Space)">
+            <span>Generate</span>
+            <kbd className="generate-btn__kbd">Space</kbd>
           </button>
         </div>
       </header>
@@ -416,10 +472,11 @@ function App() {
       <main className="palette" aria-label="Palette">
         {palette.map((c, index) => (
           <SingleColor
-            key={index}
+            key={c.id}
             index={index}
             hex={c.hex}
             locked={c.locked}
+            reduceMotion={!!reduceMotion}
             isActive={index === activeIndex}
             isEditing={index === editingIndex}
             isDragging={index === dragIndex}
@@ -451,46 +508,75 @@ function App() {
       </main>
 
       <div className="mobile-bar">
-        <button className="primary-btn primary-btn--block" type="button" onClick={generate} disabled={allLocked}>
+        {harmonySelect}
+        <button className="generate-btn generate-btn--block" type="button" onClick={generate} disabled={allLocked}>
           Generate
         </button>
       </div>
 
-      {helpOpen && (
-        <div className="overlay" onPointerDown={(e) => e.target === e.currentTarget && setHelpOpen(false)}>
-          <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">
-            <div className="dialog__header">
-              <h2 id="help-title">Keyboard shortcuts</h2>
-              <button ref={helpCloseRef} className="tool-btn" type="button" onClick={() => setHelpOpen(false)} aria-label="Close">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-              </button>
-            </div>
-            <ul className="shortcut-list">
-              {SHORTCUTS.map((s) => (
-                <li key={s.label}>
-                  <span>{s.label}</span>
-                  <span className="shortcut-keys">
-                    {s.keys.map((k) => <kbd key={k} className="kbd">{k}</kbd>)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="dialog__foot">Shortcuts act on the selected color — click a column or use the arrow keys.</p>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {helpOpen && (
+          <motion.div
+            className="overlay"
+            onPointerDown={(e) => e.target === e.currentTarget && setHelpOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.16 }}
+          >
+            <motion.div
+              className="dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="help-title"
+              {...(reduceMotion ? {} : { initial: { opacity: 0, y: 12, scale: 0.98 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 8, scale: 0.98 }, transition: { duration: 0.22, ease: EASE } })}
+            >
+              <div className="dialog__header">
+                <h2 id="help-title">Keyboard shortcuts</h2>
+                <button ref={helpCloseRef} className="icon-btn" type="button" onClick={() => setHelpOpen(false)} aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="shortcut-groups">
+                {SHORTCUT_GROUPS.map((g) => (
+                  <section key={g.title} className="shortcut-group">
+                    <h3>{g.title}</h3>
+                    <dl>
+                      {g.items.map((s) => (
+                        <div key={s.label} className="shortcut">
+                          <dt>{s.label}</dt>
+                          <dd>{s.keys.map((k) => <kbd key={k} className="kbd">{k}</kbd>)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                ))}
+              </div>
+              <p className="dialog__foot">
+                Shortcuts act on the selected color. Click a column or use the arrow keys to select one.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="toast-region" role="status" aria-live="polite">
-        {toast && (
-          <div key={toast.id} className={`toast toast--${toast.type}`}>
-            {toast.type === "success" ? (
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
-            ) : (
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16.5v.5" /></svg>
-            )}
-            {toast.message}
-          </div>
-        )}
+        <AnimatePresence mode="popLayout">
+          {toast && (
+            <motion.div
+              key={toast.id}
+              className={`toast toast--${toast.type}`}
+              {...(reduceMotion ? {} : { initial: { opacity: 0, y: 10, scale: 0.96 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.98 }, transition: { duration: 0.2, ease: EASE } })}
+            >
+              {toast.type === "success" ? (
+                <CheckCircle size={18} weight="fill" aria-hidden="true" />
+              ) : (
+                <WarningCircle size={18} weight="fill" aria-hidden="true" />
+              )}
+              {toast.message}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
